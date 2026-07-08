@@ -23,7 +23,7 @@ def run_epoch(model, batch, optimizer, Z, A, loss_fn):
     idx = torch.randperm(N)
     total, nb = 0.0, 0
     for s in range(0, N, batch):
-        bi  = idx[s:s + batch]
+        bi = idx[s:s + batch]
         zb, ab = Z[bi], A[bi]
         optimizer.zero_grad()
         loss = loss_fn(model, zb, ab)

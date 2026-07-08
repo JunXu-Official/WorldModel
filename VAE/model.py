@@ -45,10 +45,10 @@ class Encoder(nn.Module):
 class Decoder(nn.Module):
     """将潜在向量解码回 3x64x64 图像。"""
 
-    def __init__(self, img_ch, latent_dim):
+    def __init__(self, img_ch, latent_dim, hidden_dim):
         super().__init__()
         self.flat_dim = 256 * 4 * 4
-        self.fc = nn.Linear(latent_dim, self.flat_dim)
+        self.fc = nn.Linear(latent_dim + hidden_dim, self.flat_dim)
         self.deconv = nn.Sequential(
             # 256*4*4 --> 128*8*8
             nn.ConvTranspose2d(256, 128, kernel_size=4, stride=2, padding=1),
@@ -64,9 +64,10 @@ class Decoder(nn.Module):
             nn.Sigmoid(),
         )
 
-    def forward(self, z):
-        h = self.fc(z).view(-1, 256, 4, 4)
-        return self.deconv(h)
+    def forward(self, z, h):
+        x = self.fc(torch.cat([z, h], dim=-1))
+        x = x.view(x.size(0), 256, 4, 4)
+        return self.deconv(x)
 
 
 class VAE(nn.Module):
@@ -75,7 +76,7 @@ class VAE(nn.Module):
     def __init__(self, img_ch, latent_dim):
         super().__init__()
         self.encoder = Encoder(img_ch, latent_dim)
-        self.decoder = Decoder(img_ch, latent_dim)
+        self.decoder = Decoder(img_ch, latent_dim, hidden_dim=128)
 
     def reparameterize(self, mu, log_var):
         """
@@ -90,7 +91,8 @@ class VAE(nn.Module):
     def forward(self, x):
         mu, log_var = self.encoder(x)
         z = self.reparameterize(mu, log_var)
-        recon = self.decoder(z)
+        h = torch.zeros(z.size(0), 128, device=z.device)
+        recon = self.decoder(z, h)
         return recon, mu, log_var
 
     def encode(self, x):

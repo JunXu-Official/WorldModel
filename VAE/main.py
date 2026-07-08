@@ -183,6 +183,6 @@ if __name__ == '__main__':
     print('number of params:', params)
 
     train(model=model, LATENT_DIM=LATENT_DIM, IMG_SIZE=IMG_SIZE, IMG_CH=IMG_CH, dataloader=dataloader)
-    test(model=model)
-    visulize_latent_space(model=model)
-    sample_in_latent_space(model=model)
+    # test(model=model)
+    # visulize_latent_space(model=model)
+    # sample_in_latent_space(model=model)
