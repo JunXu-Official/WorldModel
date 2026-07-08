@@ -40,6 +40,10 @@ def make_trajectory(T=20, img_size=64, seed=None):
 
 
 def gen_trajs(t_steps, img_ch, img_size, latent_dim, n_traj, n_train):
+    """
+    生成一批合成估计，利用一个预训练好的编码器将高维的图像序列压缩到低维空间，并划分训练集和测试集
+    """
+    # 编码器
     encoder = Encoder(img_ch, latent_dim).to(DEVICE)
     print('正在生成 {n_traj} 条合成轨迹...')
     trajectories = [make_trajectory(T=t_steps, img_size=img_size, seed=i) for i in range(n_traj)]

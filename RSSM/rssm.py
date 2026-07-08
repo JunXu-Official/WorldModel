@@ -4,71 +4,73 @@ from config import DEVICE
 import torch.nn.functional as F
 
 class RSSM(nn.Module):
-    """循环状态空间模型（RSSM）。
-    确定性路径：h_t = GRU(h_{t-1}, z_{t-1}, a_{t-1})
-    随机先验：   z_t ~ N(mu_prior(h_t), sigma_prior(h_t))
-    随机后验：   z_t ~ N(mu_post(h_t, o_t), sigma_post(h_t, o_t))
-    训练目标：   ELBO = 重建损失 + KL(后验 || 先验)
-    hidden_dim=128, latent_dim=32
+    """
+        循环状态空间模型RSSM。
+        GRU：完全确定性的
+        MDN_RNN：满足多个高斯分布组合的混合概率模型，纯随机
+        确定性路径：h_t = GRU(h_{t-1}, z_{t-1}, a_{t-1})
+        随机先验：z_t ~ N(mu_prior(h_t), sigma_prior(h_t))
+        随机后验：z_t ~ N(mu_post(h_t, o_t), sigma_post(h_t, o_t))
+        训练目标：ELBO = 重建损失 + KL(后验 || 先验)
     """
     def __init__(self, latent_dim=32, action_dim=1, hidden_dim=128):
         super().__init__()
         self.hidden_dim = hidden_dim
         self.latent_dim = latent_dim
-
         # 确定性循环
         self.gru = nn.GRUCell(latent_dim + action_dim, hidden_dim)
-
         # 先验网络：h_t -> (mu, logvar)
+        # 只看当前的记忆h_t猜一下当前的随机状态z_t是什么
         self.prior_net = nn.Sequential(
-            nn.Linear(hidden_dim, hidden_dim), nn.ELU(),
+            nn.Linear(hidden_dim, hidden_dim), 
+            nn.ELU(),
             nn.Linear(hidden_dim, 2 * latent_dim),
         )
-
         # 后验网络：(h_t, o_t) -> (mu, logvar)，o_t 为编码后的观测
+        # 看记忆h_t和真实的观测o_t精确提取当前的随机状态z_t
         self.post_net = nn.Sequential(
-            nn.Linear(hidden_dim + latent_dim, hidden_dim), nn.ELU(),
+            nn.Linear(hidden_dim + latent_dim, hidden_dim), 
+            nn.ELU(),
             nn.Linear(hidden_dim, 2 * latent_dim),
         )
-
         # 重建头：z -> 预测 z（潜在重建目标）
         self.recon = nn.Linear(latent_dim, latent_dim)
 
     def _rsample(self, mu, logvar):
+        """
+            重参数化
+        """
         std = (0.5 * logvar).exp()
         return mu + std * torch.randn_like(std)
 
     def forward(self, z_seq, a_seq):
-        """计算整条轨迹的 ELBO 损失。
-        z_seq [B,T,D], a_seq [B,T]。
-        返回标量 ELBO 损失。
+        """
+            优化ELBO损失
         """
         B, T, D = z_seq.shape
+        # 初始化RNN的隐状态
         h = torch.zeros(B, self.hidden_dim, device=z_seq.device)
+        # 初始化随机状态
         z = torch.zeros(B, D, device=z_seq.device)
+        # 初始化loss
         recon_loss = z_seq.new_zeros(())
-        kl_loss    = z_seq.new_zeros(())
+        kl_loss = z_seq.new_zeros(())
         for t in range(T):
-            inp = torch.cat([z, a_seq[:, t].unsqueeze(-1)], dim=-1)
-            h   = self.gru(inp, h)
-
+            # 拼接当前时刻的z和动作a
+            inp = torch.cat([z, a_seq[:, t].unsqueeze(-1)], dim=-1)     # [B, D+1]
+            h = self.gru(inp, h)    # [B, hidden_dim]
             # 先验
-            pr   = self.prior_net(h)
-            mu_pr, lv_pr = pr.chunk(2, dim=-1)
-
+            pr = self.prior_net(h)
+            mu_pr, lv_pr = pr.chunk(2, dim=-1)      # [B, latent_dim], [B, latent_dim]
             # 以观测潜在向量 o_t = z_seq[:, t] 为条件的后验
-            po   = self.post_net(torch.cat([h, z_seq[:, t]], dim=-1))
-            mu_po, lv_po = po.chunk(2, dim=-1)
-
-            z = self._rsample(mu_po, lv_po)
-
+            po = self.post_net(torch.cat([h, z_seq[:, t]], dim=-1))
+            mu_po, lv_po = po.chunk(2, dim=-1) # [B, latent_dim], [B, latent_dim]
+            # 重采样拿到真正的z
+            z = self._rsample(mu_po, lv_po)     # [B, latent_dim]
             # 重建损失：预测观测潜在向量
             recon_loss = recon_loss + F.mse_loss(self.recon(z), z_seq[:, t])
-
             # KL(后验 || 先验)
-            kl = 0.5 * (
-                lv_pr - lv_po
-                + (lv_po.exp() + (mu_po - mu_pr) ** 2) / lv_pr.exp().clamp(min=1e-4)
+            kl = 0.5 * (lv_pr - lv_po + (lv_po.exp() + (mu_po - mu_pr) ** 2) / lv_pr.exp().clamp(min=1e-4)
                 - 1
             )
             kl_loss = kl_loss + kl.mean()
@@ -76,18 +78,18 @@ class RSSM(nn.Module):
         return (recon_loss + kl_loss) / T
 
     def rollout(self, z0, a_seq):
-        """仅使用先验（不观测）进行开环 rollout。
-        返回 [1, steps+1, D]。
+        """
+            rollout推理
         """
         z  = z0
         h  = torch.zeros(1, self.hidden_dim, device=z0.device)
         zs = [z]
         for a in a_seq:
             inp = torch.cat([z, a.view(1, 1)], dim=-1)
-            h   = self.gru(inp, h)
-            pr  = self.prior_net(h)
+            h = self.gru(inp, h)
+            pr = self.prior_net(h)
             mu, _ = pr.chunk(2, dim=-1)
-            z  = mu  # 确定性 rollout 使用先验均值
+            z = mu  # 确定性 rollout 使用先验均值
             zs.append(z)
         return torch.stack(zs, dim=1)
 
