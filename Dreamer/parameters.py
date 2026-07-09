@@ -33,6 +33,9 @@ class Parameter(ParameterTemplate):
         self.n_iter = 30
         parser.add_argument('--n_iter', type=int, default=self.n_iter, metavar='N', help='外层训练迭代次数')
 
+        self.n_eval = 10
+        parser.add_argument('--n_eval', type=int, default=self.n_eval, metavar='N', help='eval')
+
         self.batch_size = 4
         parser.add_argument('--batch_size', type=int, default=self.batch_size, metavar='N', help='batch size')
 

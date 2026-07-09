@@ -4,10 +4,9 @@ from parameters import Parameter
 
 class SyntheticEnv:
     """带图像观测的简单合成控制环境。"""
-    def __init__(self, parameter, seed=None):
-        self.parameter = parameter
-        self.episode_len = self.parameter.episode_len
-        self.img_size = self.parameter.img_size
+    def __init__(self, img_size, episode_len, seed=None):
+        self.episode_len = episode_len
+        self.img_size = img_size
         self.rng = np.random.default_rng(seed)
         self.pos = 0.0
         self.step_count = 0
@@ -39,7 +38,7 @@ class SyntheticEnv:
 if __name__ == '__main__':
     # 快速完整性检查
     parameter = Parameter()
-    env = SyntheticEnv(parameter=parameter, seed=0)
+    env = SyntheticEnv(img_size=parameter.img_size, episode_len=parameter.episode_len, seed=0)
     obs = env.reset()
     print(f'观测形状: {obs.shape}, 数据类型: {obs.dtype}, 范围: [{obs.min():.2f}, {obs.max():.2f}]')
     obs2, r, done = env.step(1)

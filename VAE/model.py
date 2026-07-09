@@ -39,7 +39,7 @@ class Encoder(nn.Module):
         h = self.conv(x).reshape(x.size(0), -1)
         mu, logvar = self.fc_mu(h), self.fc_log_var(h)
         std = (0.5 * logvar).exp()
-        return mu + std * torch.randn_like(std)
+        return mu + std * torch.randn_like(std), mu, logvar
 
 
 class Decoder(nn.Module):
@@ -101,7 +101,8 @@ class VAE(nn.Module):
         return mu
 
     def decode(self, z):
-        return self.decoder(z)
+        h = torch.zeros(z.size(0), 128, device=z.device)
+        return self.decoder(z, h)
 
 def elbo_loss(img_ch, img_size, recon_x, x, mu, log_var, kl_weight=1.0):
     """

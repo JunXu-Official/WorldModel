@@ -38,9 +38,10 @@ if __name__ == '__main__':
 
     img_ch = 3
     latent_dim = 32
+    hidden_dim = 128
     encoder = Encoder(img_ch=img_ch, latent_dim=latent_dim)
-    decoder = Decoder(img_ch=img_ch, latent_dim=latent_dim)
-    ckpt_path = Path('vae_encoder.pt')
+    decoder = Decoder(img_ch=img_ch, latent_dim=latent_dim, hidden_dim=hidden_dim)
+    ckpt_path = Path(r'C:\Users\Lenovo\Desktop\MyGithub\WorldModel\WorldModel\VAE\vae_encoder.pt')
     try:
         _load_vae_checkpoint(ckpt_path, encoder, decoder)
         print(f'已从 {ckpt_path} 加载 VAE 权重')

@@ -117,7 +117,9 @@ def test_rollout(model_list, decoder, rollout_steps, z_test, a_test):
 
     def decode_seq(zs):
         """zs [S, D] -> numpy [S, H, W, 3]，值域 [0,1]。"""
-        imgs = decoder(zs.to(DEVICE))  # [S, 3, H, W]
+        zs = zs.to(DEVICE)
+        h = torch.zeros(zs.size(0), 128, device=DEVICE)
+        imgs = decoder(zs, h)  # [S, 3, H, W]
         return imgs.detach().cpu().permute(0, 2, 3, 1).numpy()
 
     imgs_gru  = decode_seq(zs_gru)
@@ -254,7 +256,7 @@ n_train_trajs)
         a_train=A_train
     )
     plott(loss_list=loss_list)
-    decoder = Decoder(img_ch=3, latent_dim=32).to(DEVICE)
+    decoder = Decoder(img_ch=3, latent_dim=32, hidden_dim=128).to(DEVICE)
     imgs_gru, imgs_mdn, imgs_rssm, imgs_gt = test_rollout(
         model_list=model_list,
         decoder=decoder,

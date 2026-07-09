@@ -1,12 +1,12 @@
 import torch
-from config import DEVICE
+from utility import DEVICE, init_optimizer
 from parameters import Parameter
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent)) 
 from VAE.model import Encoder, Decoder
 from rssm import RSSM
-from ac import Actor, Critic, RewardModel
+from actor_critic import Actor, Critic, RewardModel
 
 def obs_to_tensor(obs):
     """
@@ -14,22 +14,22 @@ def obs_to_tensor(obs):
     t = torch.from_numpy(obs).permute(2, 0, 1).unsqueeze(0)
     return t.to(DEVICE)
 
-def init_model(parameter):
+def init_model(img_ch, latent_dim, action_dim, hidden_dim, ac_hidden_dim):
     """
     """
-    encoder = Encoder(img_ch=parameter.img_ch, latent_dim=parameter.latent_dim).to(DEVICE)
-    decoder = Decoder(img_ch=parameter.img_ch, latent_dim=parameter.latent_dim, hidden_dim=parameter.hidden_dim).to(DEVICE)
-    rssm = RSSM(latent_dim=parameter.latent_dim, hidden_dim=parameter.hidden_dim, action_dim=parameter.action_dim).to(DEVICE)
-    actor = Actor(latent_dim=parameter.latent_dim, hidden_dim=parameter.hidden_dim, action_dim=parameter.action_dim, ac_hidden=parameter.actor_critic_hidden).to(DEVICE)
-    critic = Critic(latent_dim=parameter.latent_dim, hidden_dim=parameter.hidden_dim, ac_hidden=parameter.actor_critic_hidden).to(DEVICE)
-    reward_model = RewardModel(latent_dim=parameter.latent_dim, hidden_dim=parameter.hidden_dim, action_dim=parameter.action_dim, ac_hidden=parameter.actor_critic_hidden).to(DEVICE)
+    encoder = Encoder(img_ch=img_ch, latent_dim=latent_dim).to(DEVICE)
+    decoder = Decoder(img_ch=img_ch, latent_dim=latent_dim, hidden_dim=hidden_dim).to(DEVICE)
+    rssm = RSSM(latent_dim=latent_dim, hidden_dim=hidden_dim, action_dim=action_dim).to(DEVICE)
+    actor = Actor(latent_dim=latent_dim, action_dim=action_dim, hidden_dim=hidden_dim, ac_hidden_dim=ac_hidden_dim, obs_feat_dim=1).to(DEVICE)
+    critic = Critic(latent_dim=latent_dim, hidden_dim=hidden_dim, ac_hidden_dim=ac_hidden_dim).to(DEVICE)
+    reward_model = RewardModel(latent_dim=latent_dim, hidden_dim=hidden_dim, action_dim=action_dim, ac_hidden_dim=ac_hidden_dim).to(DEVICE)
     models = {
         "encoder": encoder,
         "decoder": decoder,
         "rssm": rssm,
         "actor": actor,
         "critic": critic,
-        "rm": reward_model
+        "reward_model": reward_model
     }
     return models
 
@@ -39,7 +39,7 @@ def _load_encoder_decoder_from_vae_checkpoint(path, encoder):
     state = ckpt.get('model_state_dict', ckpt) if isinstance(ckpt, dict) else ckpt
 
     if isinstance(ckpt, dict) and 'encoder' in ckpt:
-        enc_state = {k.replace('fc_log_var', 'fc_logvar'): v for k, v in ckpt['encoder'].items()}
+        enc_state = {k: v for k, v in ckpt['encoder'].items()}
         encoder.load_state_dict(enc_state, strict=True)
         return '仅编码器'
 
@@ -102,7 +102,13 @@ def _load_rssm_from_rssm_checkpoint(encoder_path, rssm_path, models):
 if __name__ == "__main__":
 
     parameter = Parameter()
-    models = init_model(parameter=parameter)
+    models = init_model(
+        img_ch=parameter.img_ch,
+        latent_dim=parameter.latent_dim,
+        action_dim=parameter.action_dim,
+        hidden_dim=parameter.hidden_dim,
+        ac_hidden_dim=parameter.actor_critic_hidden
+    )
     encoder_path = r"C:\Users\Lenovo\Desktop\MyGithub\WorldModel\WorldModel\VAE\vae_encoder.pt"
     rssm_path = r"C:\Users\Lenovo\Desktop\MyGithub\WorldModel\WorldModel\RSSM\rssm.pt"
     _load_rssm_from_rssm_checkpoint(

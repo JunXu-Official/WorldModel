@@ -73,6 +73,7 @@ def train(model, LATENT_DIM, IMG_SIZE, IMG_CH, dataloader):
 
     plt.title('VAE 训练：重建损失与 KL 散度')
     fig.tight_layout()
+    plt.savefig('loss.png')
     plt.show()
 
     print(f'最终重建损失: {history_recon[-1]:.5f}')
@@ -110,6 +111,7 @@ def test(model):
     axes[1, 0].set_title('重建图像', loc='left', fontsize=12)
     plt.suptitle('原始图像与重建图像对比（训练 30 轮后）', y=1.02)
     plt.tight_layout()
+    plt.savefig('recon.png')
     plt.show()
 
 def visulize_latent_space(model):
@@ -137,6 +139,7 @@ def visulize_latent_space(model):
         axes[0, col_idx].set_title(f'z={val:.1f}', fontsize=9)
     plt.suptitle('潜在空间遍历：每次改变一个维度', fontsize=12, y=1.02)
     plt.tight_layout()
+    plt.savefig('latent_sapce.png')
     plt.show()
 
 def sample_in_latent_space(model):
@@ -183,6 +186,6 @@ if __name__ == '__main__':
     print('number of params:', params)
 
     train(model=model, LATENT_DIM=LATENT_DIM, IMG_SIZE=IMG_SIZE, IMG_CH=IMG_CH, dataloader=dataloader)
-    # test(model=model)
-    # visulize_latent_space(model=model)
-    # sample_in_latent_space(model=model)
+    test(model=model)
+    visulize_latent_space(model=model)
+    sample_in_latent_space(model=model)

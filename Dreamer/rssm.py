@@ -1,33 +1,31 @@
 import torch
 import torch.nn as nn
-from parameters import Parameter
-from config import DEVICE
+from utility import DEVICE
 import torch.nn.functional as F
 
 
 
 class RSSM(nn.Module):
-    def __init__(self, parameter):
+    def __init__(self, latent_dim, hidden_dim, action_dim):
         super().__init__()
-        self.parameter = parameter
-        self.latent_dim = self.parameter.latent_dim
-        self.hidden_dim = self.parameter.hidden_dim
-        self.action_dim = self.parameter.action_dim
+        self.latent_dim = latent_dim
+        self.hidden_dim = hidden_dim
+        self.action_dim = action_dim
 
-        self.gru = nn.GRUCell(self.parameter.latent_dim + 1, self.parameter.hidden_dim)
+        self.gru = nn.GRUCell(self.latent_dim + 1, self.hidden_dim)
         # 先验：p(z_t | h_t)
         self.prior_net = nn.Sequential(
-            nn.Linear(self.parameter.hidden_dim, self.para.hidden_dim),
+            nn.Linear(self.hidden_dim, self.hidden_dim),
             nn.ELU(),
-            nn.Linear(self.parameter.hidden_dim, 2 * self.parameter.latent_dim),
+            nn.Linear(self.hidden_dim, 2 * self.latent_dim),
         )
         # 后验：q(z_t | h_t, e_t)
         self.post_net = nn.Sequential(
-            nn.Linear(self.parameter.hidden_dim + self.parameter.latent_dim, self.parameter.hidden_dim),
+            nn.Linear(self.hidden_dim + self.latent_dim, self.hidden_dim),
             nn.ELU(),
-            nn.Linear(self.parameter.hidden_dim, 2 * self.parameter.latent_dim),
+            nn.Linear(self.hidden_dim, 2 * self.latent_dim),
         )
-        self.recon = nn.Linear(self.parameter.latent_dim, self.parameter.latent_dim)
+        self.recon = nn.Linear(self.latent_dim, self.latent_dim)
 
     def _action_feature(self, action):
         """
@@ -69,5 +67,4 @@ class RSSM(nn.Module):
         inp = torch.cat([z, action_feat], dim=-1)
         h_new = self.gru(inp, h)
         return h_new
-    
     
