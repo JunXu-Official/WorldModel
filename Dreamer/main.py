@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 
 
 
-def train(models, n_iter, batch, img_h, img_size, episode_len, action_dim, wm_params, opts):
+def train(models, n_iter, batch_size, img_h, img_size, episode_len, action_dim, wm_params, opts):
     """
     """
     # 指标历史记录。
@@ -36,7 +36,7 @@ def train(models, n_iter, batch, img_h, img_size, episode_len, action_dim, wm_pa
         ep_rewards.append(ep_reward)
         # --- 世界模型更新 ---
         buf_list = list(replay_buffer)
-        n_sample = min(batch, len(buf_list))
+        n_sample = min(batch_size, len(buf_list))
         batch = random.sample(buf_list, n_sample)
         recon_l, kl_l, reward_l = world_model_update(
             models=models, 
@@ -79,7 +79,7 @@ def train(models, n_iter, batch, img_h, img_size, episode_len, action_dim, wm_pa
                 f'策略={policy_l:.4f} | '
                 f'Actor熵={entropy:.4f}'
             )
-    return ep_reward
+    return ep_rewards
 
 
 def imagined_rollout_rewards(models, action_dim, start_h, start_z, horizon=10, deterministic=True):
@@ -162,7 +162,6 @@ def rollout(models, n_eval, episode_len, img_size, action_dim, ep_rewards):
 
     fig, axes = plt.subplots(1, 3, figsize=(15, 4))
     fig.suptitle('Dreamer 自评估', fontsize=13)
-
     # 训练过程中的回合奖励
     axes[0].plot(ep_rewards, color='steelblue', label='训练')
     axes[0].set_title('回合奖励（训练阶段）')
@@ -180,7 +179,7 @@ def rollout(models, n_eval, episode_len, img_size, action_dim, ep_rewards):
     axes[1].legend()
 
     # 各评估回合的想象轨迹熵
-    axes[2].bar(range(episode_len), imag_entropies_ev, color='mediumpurple', alpha=0.8)
+    axes[2].bar(range(n_eval), imag_entropies_ev, color='mediumpurple', alpha=0.8)
     axes[2].set_title('想象轨迹熵')
     axes[2].set_xlabel('评估回合')
     axes[2].set_ylabel('平均熵（奈特）')
@@ -189,6 +188,24 @@ def rollout(models, n_eval, episode_len, img_size, action_dim, ep_rewards):
 
     plt.tight_layout()
     plt.show()
+
+def save_pt(save_path, models, latent_dim, action_dim, hidden_dim, ac_hidden_dim):
+    checkpoint = {
+    'encoder': models['encoder'].state_dict(),
+    'decoder': models['decoder'].state_dict(),
+    'rssm': models['rssm'].state_dict(),
+    'actor': models['actor'].state_dict(),
+    'critic': models['critic'].state_dict(),
+    'reward_model': models['reward_model'].state_dict(),
+    'hyperparams': {
+        'latent_dim':  latent_dim,
+        'hidden_dim':  hidden_dim,
+        'action_dim':  action_dim,
+        'ac_hidden':   ac_hidden_dim,
+    },
+}
+    torch.save(checkpoint, save_path)
+    print(f'权重文件已保存至 {save_path}')
 
 
 if __name__ == '__main__':
@@ -208,10 +225,10 @@ if __name__ == '__main__':
         lr_wr=parameter.lr_wr
     )
     # train
-    train(
+    ep_rewards = train(
         models=models,
         n_iter=parameter.n_iter,
-        batch=parameter.batch_size,
+        batch_size=parameter.batch_size,
         img_h=parameter.imagine_h,
         img_size=parameter.img_size,
         episode_len=parameter.episode_len,
@@ -225,5 +242,15 @@ if __name__ == '__main__':
         n_eval=parameter.n_eval,
         episode_len=parameter.episode_len,
         img_size=parameter.img_size,
-        action_dim=parameter.action_dim
+        action_dim=parameter.action_dim,
+        ep_rewards=ep_rewards
+    )
+
+    save_pt(
+        save_path=r"C:\Users\Lenovo\Desktop\MyGithub\WorldModel\WorldModel\Dreamer\dreamer.pt",
+        models=models,
+        latent_dim=parameter.latent_dim,
+        action_dim=parameter.action_dim,
+        hidden_dim=parameter.hidden_dim,
+        ac_hidden_dim=parameter.actor_critic_hidden
     )
