@@ -1,10 +1,10 @@
-import random
-import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import torch.optim as optim
-from pathlib import Path
+import numpy as np
+import time
+import os
+import math
 try:
     from IPython import get_ipython
     get_ipython().run_line_magic('matplotlib', 'inline')
@@ -13,8 +13,7 @@ except Exception:
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 from matplotlib import font_manager
-from collections import deque
-
+from pathlib import Path
 
 # 让 Colab 和新环境优先使用支持中文的字体，避免标题和坐标轴显示成方框。
 def _configure_cjk_font():
@@ -61,12 +60,20 @@ def _configure_cjk_font():
     return None
 
 _CJK_FONT = _configure_cjk_font()
+
 torch.manual_seed(42)
 np.random.seed(42)
-random.seed(42)
+try:
+    import torch_xla.core.xla_model as xm
+    _XLA_AVAILABLE = True
+except Exception:
+    xm = None
+    _XLA_AVAILABLE = False
 
 
 def _resolve_device():
+    if _XLA_AVAILABLE:
+        return xm.xla_device()
     if torch.cuda.is_available():
         return torch.device('cuda')
     return torch.device('cpu')
@@ -87,50 +94,5 @@ def optimizer_step(optimizer, scaler=None):
     else:
         optimizer.step()
 
+PATH = Path('.')
 
-def init_buffer():
-    """
-    """
-    # 回放缓冲区存储轨迹字典。
-    replay_buffer = deque(maxlen=200)
-    return replay_buffer
-
-def init_optimizer(models, lr_ac, lr_wr):
-    """
-        世界模型优化器涵盖编码器、解码器和 RSSM
-    """
-    wm_params = []
-    for k, v in models.items():
-        if k != 'actor' and k != 'critic':
-            wm_params += list(v.parameters())
-        
-        if k == 'actor':
-            opt_actor = torch.optim.Adam(models['actor'].parameters(),  lr=lr_ac)
-        if k == 'critic':
-            opt_critic = torch.optim.Adam(models['critic'].parameters(), lr=lr_ac)
-    
-    opt_wm = torch.optim.Adam(wm_params, lr=lr_wr)
-    
-    opts = {
-        "opt_wm": opt_wm,
-        "opt_actor": opt_actor,
-        "opt_critic": opt_critic
-    }
-    
-    return wm_params, opts
-
-
-def action_to_onehot(action_int, action_dim):
-    """
-        将动作标量转化为one-hot
-    """
-    oh = torch.zeros(1, action_dim, device=DEVICE)
-    oh[0, action_int] = 1.0
-    return oh    
-
-def obs_to_tensor(obs):
-    """
-        obs转tensor
-    """
-    t = torch.from_numpy(obs).permute(2, 0, 1).unsqueeze(0)
-    return t.to(DEVICE)

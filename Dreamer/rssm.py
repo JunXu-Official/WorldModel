@@ -48,6 +48,9 @@ class RSSM(nn.Module):
         return h, z
 
     def prior(self, h):
+        """
+            RSSM先验
+        """
         out = self.prior_net(h)
         mu, logvar = out.chunk(2, dim=-1)
         std = F.softplus(logvar) + 0.1
@@ -55,6 +58,9 @@ class RSSM(nn.Module):
         return z, mu, std
 
     def posterior(self, h, enc_z):
+        """
+            RSSM后验
+        """
         out = self.post_net(torch.cat([h, enc_z], dim=-1))
         mu, logvar = out.chunk(2, dim=-1)
         std = F.softplus(logvar) + 0.1
