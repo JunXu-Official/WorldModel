@@ -90,7 +90,7 @@ if __name__ == "__main__":
     train(
         model=catvae,
         data_loader=data_loader, 
-        epoches=parameter.epoches
+        epoches=parameter.catVAE_epoches
     )
     rollout(
         model=catvae,
